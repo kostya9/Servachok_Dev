@@ -7,13 +7,13 @@ import numpy as np
 
 SCREEN_MULTIPLIER = 120
 
-PLAYERS = 6
+PLAYERS = 3
 
 
 class Coords(object):
-    def __init__(self):
-        self.x = 0
-        self.y = 0
+    def __init__(self, x=0, y=0):
+        self.x = x
+        self.y = y
 
     def radius_calculation(self):
         return math.pow(math.pow(self.x, 2) + math.pow(self.y, 2), 1 / 2)
@@ -42,11 +42,12 @@ class MapGenerator(object):
     def __generate_start_position(self, players_count):
 
         alpha = random.randint(0, int(360 / players_count))
+
         for i in range(players_count):
             coord = Coords()
             tang = math.tan(alpha * math.pi / 180)
 
-            if alpha > 360:
+            if alpha >= 360:
                 alpha -= 360
 
             if alpha == 90:
@@ -94,6 +95,9 @@ class MapGenerator(object):
                     height_border = self.__screen_length / 2
                     coord.y = height_border * tang
                     coord.x = self.__screen_length / 2
+            else:
+                coord.y = 0
+                coord.x = self.__screen_length / 2
             self.__planets.append([coord.radius_calculation(), coord, alpha])
             alpha += 360 / players_count
 
@@ -110,12 +114,18 @@ class MapGenerator(object):
         circle_rad = min_rad[0]
         coords = []
 
+        subplanet_radius = circle_rad * math.sin(math.pi / PLAYERS)
+
+        plt.figure()
+
         for i in self.__planets:
-            coords.append(i[1].get_coord())
+            position = i[1].get_coord()
+            coords.append(position)
+            c = plt.Circle(position, radius=subplanet_radius, fill=False, color="blue")
+            plt.gca().add_patch(c)
 
         X = np.array(coords)
 
-        plt.figure()
         plt.axis("equal")
         plt.xlim((-self.__screen_length / 2, self.__screen_length / 2))
         plt.ylim((-self.__screen_height / 2, self.__screen_height / 2))
