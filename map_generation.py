@@ -7,7 +7,7 @@ import numpy as np
 
 SCREEN_MULTIPLIER = 120
 
-PLAYERS = 3
+PLAYERS = 2
 
 
 class Coords(object):
