@@ -8,20 +8,18 @@ import numpy as np
 from planet import Planet, PlanetType
 from utils import Coords
 
-SCREEN_MULTIPLIER = 100
+SCREEN_MULTIPLIER = 120
 
 PLAYERS = random.randint(2, 8)
 
 # PLAYERS = 8
-
-PLANET_FREE_SPACE_RADIUS = 50
 
 
 class MapGenerator(object):
     LENGTH_MULTIPLIER = 16
     HEIGHT_MULTIPLIER = 9
 
-    def __init__(self, screen_scale_multiplier):
+    def __init__(self, screen_scale_multiplier, planet_free_space_radius=None):
         self.__screen_length = self.LENGTH_MULTIPLIER * screen_scale_multiplier
         self.__screen_height = self.HEIGHT_MULTIPLIER * screen_scale_multiplier
         self.__border_angle = math.atan(self.HEIGHT_MULTIPLIER / self.LENGTH_MULTIPLIER) * 180 / math.pi
@@ -32,6 +30,11 @@ class MapGenerator(object):
         self.__players = -1
         self.__start_position_radius = 0
         self.__max_gen_try = 25
+
+        if planet_free_space_radius:
+            self.__planet_free_space_radius = planet_free_space_radius
+        else:
+            self.__planet_free_space_radius = round(50/120 * screen_scale_multiplier)
 
     def run(self, players_count):
         self.__players = players_count
@@ -99,7 +102,7 @@ class MapGenerator(object):
             alpha += 360 / players_count
 
         min_rad = min(planets[1:], key=lambda x: x[0])
-        self.__start_position_radius = min_rad[0] - PLANET_FREE_SPACE_RADIUS
+        self.__start_position_radius = min_rad[0] - self.__planet_free_space_radius
 
         for i in planets[1:]:
             i[1].coords.x = int(self.__start_position_radius * math.cos(i[2] * math.pi / 180))
@@ -117,24 +120,24 @@ class MapGenerator(object):
             subplanets = []
             while True:
                 sub_alpha = random.randint(0, 359)
-                sub_radius = random.randint(2 * PLANET_FREE_SPACE_RADIUS,
+                sub_radius = random.randint(2 * self.__planet_free_space_radius,
                                             int(self.__start_position_radius * math.sin(
-                                                math.pi / self.__players)) - PLANET_FREE_SPACE_RADIUS)
+                                                math.pi / self.__players)) - self.__planet_free_space_radius)
                 check = True
                 new_planet = Planet(Coords(sub_radius * math.cos(sub_alpha * math.pi / 180) + planet.coords.x,
                                            sub_radius * math.sin(sub_alpha * math.pi / 180) + planet.coords.y),
                                     random.choices([PlanetType.SMALL, PlanetType.MEDIUM, PlanetType.BIG],
                                                    [600, 300, 200])[0])
 
-                if abs(new_planet.coords.x) > self.__screen_length / 2 - PLANET_FREE_SPACE_RADIUS or \
-                        abs(new_planet.coords.y) > self.__screen_height / 2 - PLANET_FREE_SPACE_RADIUS:
+                if abs(new_planet.coords.x) > self.__screen_length / 2 - self.__planet_free_space_radius or \
+                        abs(new_planet.coords.y) > self.__screen_height / 2 - self.__planet_free_space_radius:
                     try_num += 1
                     if try_num > max_try:
                         break
                     continue
 
                 for i in subplanets:
-                    if new_planet.coords.calc_distance(i.coords) < 2 * PLANET_FREE_SPACE_RADIUS:
+                    if new_planet.coords.calc_distance(i.coords) < 2 * self.__planet_free_space_radius:
                         check = False
                         break
 
@@ -167,8 +170,8 @@ class MapGenerator(object):
                                 random.choices([PlanetType.SMALL, PlanetType.MEDIUM, PlanetType.BIG],
                                                [600, 300, 200])[0])
 
-            if abs(new_planet.coords.x) > self.__screen_length / 2 - PLANET_FREE_SPACE_RADIUS or \
-                    abs(new_planet.coords.y) > self.__screen_height / 2 - PLANET_FREE_SPACE_RADIUS:
+            if abs(new_planet.coords.x) > self.__screen_length / 2 - self.__planet_free_space_radius or \
+                    abs(new_planet.coords.y) > self.__screen_height / 2 - self.__planet_free_space_radius:
                 check = False
 
             subradius = self.__start_position_radius * math.sin(math.pi / self.__players)
@@ -185,7 +188,7 @@ class MapGenerator(object):
             #         break
 
             for i in separated:
-                if new_planet.coords.calc_distance(i.coords) < 2 * PLANET_FREE_SPACE_RADIUS:
+                if new_planet.coords.calc_distance(i.coords) < 2 * self.__planet_free_space_radius:
                     check = False
                     break
 
