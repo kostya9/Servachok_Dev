@@ -19,7 +19,7 @@ class MapGenerator(object):
     LENGTH_MULTIPLIER = 16
     HEIGHT_MULTIPLIER = 9
 
-    def __init__(self, screen_scale_multiplier, planet_free_space_radius=None):
+    def __init__(self, screen_scale_multiplier=120, planet_free_space_radius=None):
         self.__screen_length = self.LENGTH_MULTIPLIER * screen_scale_multiplier
         self.__screen_height = self.HEIGHT_MULTIPLIER * screen_scale_multiplier
         self.__border_angle = math.atan(self.HEIGHT_MULTIPLIER / self.LENGTH_MULTIPLIER) * 180 / math.pi
@@ -249,7 +249,7 @@ class MapGenerator(object):
 
         plt.show()
 
-
-test = MapGenerator(SCREEN_MULTIPLIER)
-print(test.run(PLAYERS))
-test.display()
+#
+# test = MapGenerator(SCREEN_MULTIPLIER)
+# print(test.run(PLAYERS))
+# test.display()
