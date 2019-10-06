@@ -26,7 +26,7 @@ class MapGenerator(object):
         self.__planets = []
         self.__max_planet_count = random.randint(40, 55)
         # self.__max_planet_count = 45
-        print(self.__max_planet_count)
+        # print(self.__max_planet_count)
         self.__players = -1
         self.__start_position_radius = 0
         self.__max_gen_try = 25
@@ -36,19 +36,20 @@ class MapGenerator(object):
         else:
             self.__planet_free_space_radius = round(50/120 * screen_scale_multiplier)
 
-    def run(self, players_count):
-        self.__players = players_count
-        self.__generate_start_position(players_count)
+    def run(self, players_ids):
+        self.__players = len(players_ids)
+        self.__generate_start_position(players_ids)
         self.__generate_subplanet()
         self.__generate_separated_planet()
         return self.__planets
 
-    def __generate_start_position(self, players_count):
+    def __generate_start_position(self, players_ids):
+        players_count = len(players_ids)
 
         planets = [[0, Planet(Coords(0, 0), PlanetType.BIGGEST), 0]]
 
         alpha = random.randint(0, int(360 / players_count))
-        for i in range(players_count):
+        for player_id in players_ids:
             coord = Coords()
             tang = math.tan(alpha * math.pi / 180)
 
@@ -98,7 +99,7 @@ class MapGenerator(object):
                     coord.y = height_border * tang
                     coord.x = self.__screen_length / 2
 
-            planets.append([coord.radius_calculation(), Planet(coord, PlanetType.BIG), alpha])
+            planets.append([coord.radius_calculation(), Planet(coord, PlanetType.BIG, player_id), alpha])
             alpha += 360 / players_count
 
         min_rad = min(planets[1:], key=lambda x: x[0])
@@ -208,7 +209,7 @@ class MapGenerator(object):
         self.__planets += separated[1:]
 
     def display(self):
-        print(len(self.__planets))
+        # print(len(self.__planets))
         coords = []
 
         # subplanet_radius = self.__start_position_radius * math.sin(math.pi / self.__players)

@@ -25,19 +25,20 @@ def request(string):
 
 class Server(metaclass=Singleton):
     def __init__(self, port=10800, max_client_count=8):
-        self.server = create_tcp_server(('0.0.0.0', port), max_client_count)
+        self.server = create_tcp_server(('127.0.0.1', port), max_client_count)
         self.started = True
         self.clients = []
         self.__max_clients_count = max_client_count
         self.players = {}
         self.next_player_id = 0
+        self.readiness = False
         self.game_started = False
 
         self.__handler_queue = MaxPriorityQueue()
         self.__sender_queue = MaxPriorityQueue()
         self.__threads = []
 
-        self.__map = None
+        # self.__map = None
 
     def __start_thread(self, name, callback, args=None):
         self.__threads.append(StoppedThread(name=name, target=callback, args=args))
@@ -60,13 +61,13 @@ class Server(metaclass=Singleton):
 
             for sock in readable:
                 if sock is self.server:
-                    if not self.game_started and len(self.clients) < self.__max_clients_count:
+                    if not self.game_started and not self.readiness and len(self.clients) < self.__max_clients_count:
                         client, address = sock.accept()
                         print(address)
                         client.setblocking(0)
                         self.clients.append(client)
                         self.next_player_id += 1
-                        self.players[client] = {
+                        player = {
                             'id': self.next_player_id,
                             'address': address,
                             'ready': False,
@@ -74,12 +75,23 @@ class Server(metaclass=Singleton):
                             'object_ids': [],
                             'name': 'client {}'.format(self.next_player_id),
                         }
+
+                        self.players[client] = player
+
+                        self.__sender_queue.insert({
+                            'name': 'connect',
+                            'player': {
+                                'id': player['id'],
+                                'name': player['name'],
+                                'ready': player['ready'],
+                            },
+                        }, 1)
                 else:
                     data_size = sock.recv(struct.calcsize('i'))
 
                     if data_size:
                         data_size = struct.unpack('i', data_size)[0]
-                        event = str(sock.recv(data_size))
+                        event = sock.recv(data_size)
 
                         if event:
                             event = json.loads(event)
@@ -90,17 +102,20 @@ class Server(metaclass=Singleton):
                                 self.__handler_queue.insert((event, sock), 1)
                         else:
                             self.clients.remove(sock)
+                            del self.players[sock]
                             sock.close()
                     else:
                         self.clients.remove(sock)
+                        del self.players[sock]
                         sock.close()
 
     def sender(self, is_alive):
         while is_alive():
-            data = self.__sender_queue.remove()
+            if not self.__sender_queue.empty():
+                data = self.__sender_queue.remove()
 
-            for player in self.clients:
-                player.send(request(json.dumps(data)))
+                for player in self.clients:
+                    player.send(request(json.dumps(data)))
 
     def all_clients(self, field):
         return all(player[field] for player in self.players.values())
@@ -110,6 +125,7 @@ class Server(metaclass=Singleton):
         while is_alive():
             if not self.__handler_queue.empty():
                 event, client = self.__handler_queue.remove()
+
                 if event['name'] == "ready":
                     self.players[client]['ready'] = event['ready']
 
@@ -123,11 +139,13 @@ class Server(metaclass=Singleton):
 
                     ready = self.all_clients('ready')
 
-                    if ready:
-                        # TODO: generate map
-                        self.__map = MapGenerator().run(len(self.players))
+                    if ready and len(self.players) > 1:
+                        gen = MapGenerator()
+                        map = gen.run([player['id'] for player in self.players.values()])
+                        gen.display()
+                        game_map = [planet.get_dict() for planet in map]
 
-                        game_map = [planet.get_dict() for planet in self.__map]
+                        self.readiness = True
 
                         message = {
                             'name': 'mapinit',
@@ -218,9 +236,13 @@ class Server(metaclass=Singleton):
                             if len(active_players) >= 2:
                                 break
                         else:
-                            self.game_started = False
-
                             self.__sender_queue.insert({
                                 'name': 'gameover',
                                 'winner': active_players[0]
                             }, 1)
+
+                            self.readiness = False
+                            self.game_started = False
+
+                            self.players = {}
+                            self.clients = []
