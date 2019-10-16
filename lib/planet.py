@@ -1,3 +1,4 @@
+import random
 from enum import IntEnum
 
 from utils import id_generator
@@ -7,16 +8,18 @@ class PlanetType(IntEnum):
     SMALL = 1
     MEDIUM = 2
     BIG = 3
-    BIGGEST = 4
 
 
 class Planet:
     cache = {}
 
-    def __init__(self, coords, planet_type, owner=None):
+    def __init__(self, coords, planet_type, owner=None, units_count=None):
         self.coords = coords
         self.type = planet_type
-        self.units_count = 50 * planet_type.value
+        if units_count:
+            self.units_count = units_count
+        else:
+            self.units_count = random.randint(0, 40) * planet_type.value
         self.owner = owner
         self.__id = next(id_generator)
 

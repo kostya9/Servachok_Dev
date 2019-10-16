@@ -85,7 +85,8 @@ class StoppedThread(Thread):
         return not self.stopper.is_set()
 
     def run(self):
-        self._target(self.is_alive, *self._args, **self._kwargs)
+        while self.is_alive():
+            self._target()
 
     def start(self):
         super().start()

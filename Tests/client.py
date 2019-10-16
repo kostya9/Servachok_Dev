@@ -29,13 +29,13 @@ def display(planets):
     X = np.array(coords)
 
     plt.axis("equal")
-    plt.xlim((-120*16/2 - 150, 120*16/2 + 150))
-    plt.ylim((-120*9/2 - 150, 120*9/2 + 150))
+    plt.xlim((-120 * 16 / 2 - 150, 120 * 16 / 2 + 150))
+    plt.ylim((-120 * 9 / 2 - 150, 120 * 9 / 2 + 150))
 
-    t1 = plt.Polygon(X[1:1 + 2], fill=False, color="black")
+    t1 = plt.Polygon(X[:2], fill=False, color="black")
     plt.gca().add_patch(t1)
 
-    screen = plt.Rectangle((-120*16/2, -120*9 / 2), 120*16,120*9, fill=False,
+    screen = plt.Rectangle((-120 * 16 / 2, -120 * 9 / 2), 120 * 16, 120 * 9, fill=False,
                            color="black")
     plt.gca().add_patch(screen)
     colors = [colors[i['type'] - 1] for i in planets]
