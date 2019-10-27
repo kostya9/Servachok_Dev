@@ -1,87 +1,90 @@
-import math
 from queue import PriorityQueue
-from threading import Thread, Event, Lock
+from threading import Event, Lock, Thread
+
+from lib.events import GameEvent, EventName
 
 
-def generate_id():
-    _id = 1
-    while True:
-        yield _id
-        _id += 1
+class PriorityQueueEvent(object):
+    def __init__(self, event: GameEvent, priority: int):
+        self.event = event
 
+        if priority is None:
+            self.priority = self.__priority_factory()
+        else:
+            self.priority = priority
 
-id_generator = generate_id()
+    def __priority_factory(self) -> int:
+        if self.event.name == EventName.MOVE:
+            return 0
+        return 1
 
+    def __gt__(self, other: 'PriorityQueueEvent') -> bool:
+        return self.priority < other.priority
 
-class Coords(object):
-    def __init__(self, x=0, y=0):
-        self.x = x
-        self.y = y
-
-    def __str__(self):
-        return "({}, {})".format(self.x, self.y)
-
-    def get_dict(self):
-        res_dict = {'x': self.x, 'y': self.y}
-        return res_dict
-
-    def radius_calculation(self):
-        return math.pow(math.pow(self.x, 2) + math.pow(self.y, 2), 1 / 2)
-
-    def get_coord(self):
-        return self.x, self.y
-
-    def calc_distance(self, point):
-        return math.pow(math.pow(self.x - point.x, 2) + math.pow(self.y - point.y, 2), 1 / 2)
-
-
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class MaxPriorityItem(object):
-    def __init__(self, item, priority):
-        self.item = item
-        self.priority = priority
-
-    def __lt__(self, other):
+    def __lt__(self, other: 'PriorityQueueEvent') -> bool:
         return self.priority > other.priority
 
 
-class MaxPriorityQueue(object):
+class EventPriorityQueue(object):
     def __init__(self):
         self.__queue = PriorityQueue()
         self.__mutex = Lock()
 
-    def insert(self, item, priority=0):
-        self.__mutex.acquire()
-        self.__queue.put(MaxPriorityItem(item, priority))
-        self.__mutex.release()
+    def insert(self, event: GameEvent, priority: int = None):
+        with self.__mutex:
+            item = PriorityQueueEvent(event, priority)
+            self.__queue.put(item)
 
-    def remove(self):
-        self.__mutex.acquire()
-        item = self.__queue.get()
-        self.__mutex.release()
-        return item.item if item else None
+    def remove(self) -> GameEvent:
+        with self.__mutex:
+            item = self.__queue.get()
+        return item.event if item else None
 
-    def empty(self):
-        self.__mutex.acquire()
-        is_empty = self.__queue.empty()
-        self.__mutex.release()
-        return is_empty
+    def empty(self) -> bool:
+        with self.__mutex:
+            return self.__queue.empty()
+
+
+def __generate_id() -> int:
+    id_ = 1
+    while True:
+        yield id_
+        id_ += 1
+
+
+ID_GENERATOR = __generate_id()
+
+
+class Coords(object):
+    def __init__(self, x: int = 0, y: int = 0):
+        self.x = x
+        self.y = y
+
+    def __str__(self):
+        return '({}, {})'.format(self.x, self.y)
+
+    def get_dict(self) -> dict:
+        return vars(self)
+
+    def radius_calculation(self) -> float:
+        return (self.x ** 2 + self.y ** 2) ** 0.5
+
+    def get_coord(self) -> tuple:
+        return self.x, self.y
+
+    def calc_distance(self, point: 'Coords') -> float:
+        return ((self.x - point.x) ** 2 + (self.y - point.y) ** 2) ** 0.5
 
 
 class StoppedThread(Thread):
-    def __init__(self, target=None, name=None, args=None, **kwargs):
+    def __init__(self, target=None, name=None, args=(), **kwargs):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs
         super().__init__(target=target, name=name, args=args, kwargs=kwargs)
         self.stopper = Event()
 
-    def is_alive(self):
+    def is_alive(self) -> bool:
         return not self.stopper.is_set()
 
     def run(self):
@@ -90,9 +93,9 @@ class StoppedThread(Thread):
 
     def start(self):
         super().start()
-        print(self.name, "started")
+        print('{} started'.format(self.name))
 
     def stop(self):
-        print(self.name, "stopping...")
+        print('{} stopping...'.format(self.name))
         self.stopper.set()
-        print(self.name, "stopped")
+        print('{} stopped'.format(self.name))
