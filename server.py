@@ -1,14 +1,13 @@
-import json
 import select
 import socket
 import struct
 from typing import Callable, Dict, List, Union
 
-from events import ConnectEvent, EventNames, PlayerEvent, PriorityQueueEvent, SimpleEvent
+from events import ClientEvent, ServerEvent, ClientEventName, ServerEventName
 from map_generator import MapGenerator
 from planet import Planet
 from player import Player
-from utils import ID_GENERATOR, MaxPriorityQueue, Singleton, StoppedThread
+from utils import EventPriorityQueue, StoppedThread, ID_GENERATOR
 
 MAX_CLIENT_COUNT = 8
 
@@ -22,11 +21,7 @@ def create_tcp_server(server_address: Union[tuple, str, bytes], backlog: int, bl
     return server_socket
 
 
-def request(string: str) -> bytes:
-    return struct.pack('i', len(string)) + string.encode('utf-8')
-
-
-class Server(metaclass=Singleton):
+class Server(object):
     RECEIVER_TIMEOUT = 10  # seconds
 
     def __init__(self, port: int = 10800, max_client_count: int = MAX_CLIENT_COUNT):
@@ -39,40 +34,40 @@ class Server(metaclass=Singleton):
         self.readiness = False
         self.game_started = False
 
-        self.__handler_queue = MaxPriorityQueue()
-        self.__sender_queue = MaxPriorityQueue()
-        self.__threads: List[StoppedThread] = []
+        self.__handler_queue = EventPriorityQueue()
+        self.__sender_queue = EventPriorityQueue()
 
-        # self.__map = None
+        self.__threads: List[StoppedThread] = []
 
     def __start_thread(self, name, callback, args=None):
         t = StoppedThread(name=name, target=callback, args=args)
         self.__threads.append(t)
-        # t.daemon = True
         t.start()
 
     def start(self):
-        self.__start_thread(name='receiver', callback=self.receiver, args=())
-        self.__start_thread(name='handler', callback=self.handler, args=())
-        self.__start_thread(name='sender', callback=self.sender, args=())
+        self.__start_thread(name='receiver', callback=self.__receiver, args=())
+        self.__start_thread(name='handler', callback=self.__handler, args=())
+        self.__start_thread(name='sender', callback=self.__sender, args=())
 
     def stop(self):
         for thread in self.__threads:
             thread.stop()
             thread.join()
 
-    def __wait_for_clients(self, server_sock):
+    def __wait_for_client(self, server_sock):
         if not self.game_started and not self.readiness and len(self.clients) < self.__max_clients_count:
             client, address = server_sock.accept()
-            print(address)
             client.setblocking(0)
+
             self.clients.append(client)
             self.next_player_id += 1
 
-            player = Player(address=address, id_=self.next_player_id)
+            player = Player(address, self.next_player_id)
             self.players[client] = player
-            event = PriorityQueueEvent(ConnectEvent(player=player))
-            self.__sender_queue.insert(**event.get_queue_payload())
+
+            self.__notify(ServerEventName.CONNECT, {
+                'player': player.info()
+            })
 
     def __remove_client(self, client_sock):
         self.clients.remove(client_sock)
@@ -87,74 +82,50 @@ class Server(metaclass=Singleton):
             event = client_sock.recv(data_size)
 
             if event:
-                event = json.loads(event)
                 player = self.players[client_sock]
-                event = PriorityQueueEvent(PlayerEvent(raw_event=event, sender=player))
-                self.__handler_queue.insert(**event.get_queue_payload())
+                event = ClientEvent(player, event)
+                self.__handler_queue.insert(event)
             else:
                 self.__remove_client(client_sock)
         else:
             self.__remove_client(client_sock)
 
-    def receiver(self, is_alive: Callable):
+    def __receiver(self, is_alive: Callable):
         while is_alive():
             readable, *_ = select.select([self.server, *self.clients], [], [], self.RECEIVER_TIMEOUT)
 
             for sock in readable:
                 if sock is self.server:
-                    self.__wait_for_clients(sock)
+                    self.__wait_for_client(sock)
                 else:
                     self.__wait_for_client_data(sock)
 
-    def sender(self, is_alive: Callable):
+    def __sender(self, is_alive: Callable):
         while is_alive():
             if not self.__sender_queue.empty():
-                data = self.__sender_queue.remove()
+                event = self.__sender_queue.remove()
 
-                for player in self.clients:
-                    player.send(request(json.dumps(data)))
+                for client in self.clients:
+                    client.send(event.request())
 
-    def __is_game_over(self):
-        active_players = []
+    def __notify(self, name: ServerEventName, args: dict):
+        self.__sender_queue.insert(ServerEvent(name, args))
 
-        for player in self.players.values():
-            if len(player.object_ids) > 0:
-                for planet in Planet.cache.values():
-                    if planet.owner == player.id:
-                        active_players.append(player.id)
-                        break
-            if len(active_players) >= 2:
-                break
-        else:
-            event = PriorityQueueEvent(SimpleEvent(
-                name=EventNames.GAME_OVER,
-                winner=active_players[0]
-            ), 1)
-            self.__sender_queue.insert(**event.get_queue_payload())
-
-            self.readiness = False
-            self.game_started = False
-
-            self.players = {}
-            self.clients = []
-
-    # def handler(self, client, client_event):
-    def handler(self, is_alive: Callable):
+    def __handler(self, is_alive: Callable):
         while is_alive():
             if not self.__handler_queue.empty():
-                event, player = self.__handler_queue.remove()
+                event = self.__handler_queue.remove()
+                player = event.payload['player']
 
-                if event['name'] == EventNames.READY:
-                    player.ready = event['ready']
+                if event.name == ClientEventName.READY:
+                    player.ready = event.payload['ready']
 
-                    event = PriorityQueueEvent(SimpleEvent(
-                        name=EventNames.READY,
-                        player=player.id,
-                        ready=event['ready']
-                    ), 1)
-                    self.__sender_queue.insert(**event.get_queue_payload())
+                    self.__notify(event.name, {
+                        'player': player.id,
+                        'ready': event.payload['ready'],
+                    })
 
-                    all_ready = all(player.is_ready() for player in self.players.values())
+                    all_ready = all(player.ready for player in self.players.values())
 
                     if all_ready and len(self.players) > 1:
                         gen = MapGenerator()
@@ -164,34 +135,25 @@ class Server(metaclass=Singleton):
 
                         self.readiness = True
 
-                        event = PriorityQueueEvent(SimpleEvent(
-                            name=EventNames.MAP_INIT,
-                            map=game_map
-                        ), 1)
-                        self.__sender_queue.insert(**event.get_queue_payload())
+                        self.__notify(ServerEventName.MAP_INIT, {
+                            'map': game_map
+                        })
 
-                elif event['name'] == EventNames.RENDERED:
+                elif event.name == ClientEventName.RENDERED:
                     player.rendered = True
 
-                    if all(player.is_rendered() for player in self.players.values()):
-                        # TODO game start event
-                        event = PriorityQueueEvent(SimpleEvent(
-                            name=EventNames.GAME_STARTED
-                        ), 1)
-                        self.__sender_queue.insert(**event.get_queue_payload())
+                    if all(player.rendered for player in self.players.values()):
+                        self.__notify(ServerEventName.GAME_STARTED, {})
                         self.game_started = True
 
                 if self.game_started:
-                    if event['name'] == EventNames.MOVE:
-                        if int(event['unit_id']) in player.object_ids:
-                            event = PriorityQueueEvent(SimpleEvent(
-                                **event
-                            ), 0)
-                            self.__sender_queue.insert(**event.get_queue_payload())
+                    if event.name == ClientEventName.MOVE:
+                        if int(event.payload['unit_id']) in player.object_ids:
+                            self.__notify(event.name, event.payload)
 
-                    elif event['name'] == EventNames.SELECT:
-                        planet_ids = event['from']
-                        percentage = event['percentage']
+                    elif event.name == ClientEventName.SELECT:
+                        planet_ids = event.payload['from']
+                        percentage = event.payload['percentage']
 
                         punits = {}
 
@@ -204,29 +166,24 @@ class Server(metaclass=Singleton):
                                 punits[planet_id] = [next(ID_GENERATOR) for _ in range(new_ships_count)]
                                 player.object_ids += punits[planet_id]
 
-                        event = PriorityQueueEvent(SimpleEvent(
-                            name=EventNames.SELECT,
-                            selected=punits
-                        ), 1)
-                        self.__sender_queue.insert(**event.get_queue_payload())
+                        self.__notify(event.name, {
+                            'selected': punits
+                        })
 
-                    elif event['name'] == EventNames.ADD_HP:
-                        planet_id = int(event['planet_id'])
-                        hp_count = int(event['hp_count'])
+                    elif event.name == ClientEventName.ADD_HP:
+                        planet_id = int(event.payload['planet_id'])
+                        hp_count = int(event.payload['hp_count'])
 
                         planet = Planet.cache[planet_id]
 
                         if planet.owner == player.id:
                             planet.units_count += hp_count
-                            event = PriorityQueueEvent(SimpleEvent(
-                                **event
-                            ), 1)
-                            self.__sender_queue.insert(**event.get_queue_payload())
+                            self.__notify(event.name, event.payload)
 
-                    elif event['name'] == EventNames.DAMAGE:
-                        planet_id = int(event['planet_id'])
-                        unit_id = int(event['unit_id'])
-                        hp_count = int(event.get('hp_count', 1))
+                    elif event.name == ClientEventName.DAMAGE:
+                        planet_id = int(event.payload['planet_id'])
+                        unit_id = int(event.payload['unit_id'])
+                        hp_count = int(event.payload.get('hp_count', 1))
 
                         planet = Planet.cache[planet_id]
 
@@ -241,17 +198,34 @@ class Server(metaclass=Singleton):
 
                             player.object_ids.remove(unit_id)
 
-                            event = PriorityQueueEvent(SimpleEvent(
-                                name=EventNames.DAMAGE,
-                                planet_change={
+                            self.__notify(event.name, {
+                                'planet_change': {
                                     'id': planet_id,
                                     'units_count': planet.units_count,
                                     'owner': planet.owner,
                                 },
-                                unit_id=unit_id
-                            ), 1)
-                            self.__sender_queue.insert(**event.get_queue_payload())
+                                'unit_id': unit_id,
+                            })
 
                         # check game over
 
-                        self.__is_game_over()
+                        active_players = []
+
+                        for player in self.players.values():
+                            if len(player.object_ids) > 0:
+                                for planet in Planet.cache.values():
+                                    if planet.owner == player.id:
+                                        active_players.append(player.id)
+                                        break
+                            if len(active_players) >= 2:
+                                break
+                        else:
+                            self.__notify(ServerEventName.GAME_OVER, {
+                                'winner': active_players[0],
+                            })
+
+                            self.readiness = False
+                            self.game_started = False
+
+                            self.players = {}
+                            self.clients = []

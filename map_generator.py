@@ -193,6 +193,7 @@ class MapGenerator(object):
         separated_num = 0
         try_num = 0
         separated = [self.__planets[0], ]
+
         while (try_num <= self.__max_gen_try_separated_planets) and (separated_num < separated_max_count):
             x = random.randint(-self.__screen_length / 2, self.__screen_length / 2)
             y = random.randint(-self.__screen_height / 2, self.__screen_height / 2)

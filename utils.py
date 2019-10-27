@@ -1,6 +1,48 @@
 from queue import PriorityQueue
 from threading import Event, Lock, Thread
-from typing import Any
+
+from events import GameEvent, EventName
+
+
+class PriorityQueueEvent(object):
+    def __init__(self, event: GameEvent, priority: int):
+        self.event = event
+
+        if priority is None:
+            self.priority = self.__priority_factory()
+        else:
+            self.priority = priority
+
+    def __priority_factory(self) -> int:
+        if self.event.name == EventName.MOVE:
+            return 0
+        return 1
+
+    def __gt__(self, other: 'PriorityQueueEvent') -> bool:
+        return self.priority < other.priority
+
+    def __lt__(self, other: 'PriorityQueueEvent') -> bool:
+        return self.priority > other.priority
+
+
+class EventPriorityQueue(object):
+    def __init__(self):
+        self.__queue = PriorityQueue()
+        self.__mutex = Lock()
+
+    def insert(self, event: GameEvent, priority: int = None):
+        with self.__mutex:
+            item = PriorityQueueEvent(event, priority)
+            self.__queue.put(item)
+
+    def remove(self) -> GameEvent:
+        with self.__mutex:
+            item = self.__queue.get()
+        return item.event if item else None
+
+    def empty(self) -> bool:
+        with self.__mutex:
+            return self.__queue.empty()
 
 
 def __generate_id() -> int:
@@ -32,46 +74,6 @@ class Coords(object):
 
     def calc_distance(self, point: 'Coords') -> float:
         return ((self.x - point.x) ** 2 + (self.y - point.y) ** 2) ** 0.5
-
-
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class MaxPriorityItem(object):
-    def __init__(self, item: Any, priority: int):
-        self.item = item
-        self.priority = priority
-
-    def __gt__(self, other):
-        return self.priority < other.priority
-
-    def __lt__(self, other):
-        return self.priority > other.priority
-
-
-class MaxPriorityQueue(object):
-    def __init__(self):
-        self.__queue = PriorityQueue()
-        self.__mutex = Lock()
-
-    def insert(self, item: Any, priority: int = 0):
-        with self.__mutex:
-            self.__queue.put(MaxPriorityItem(item, priority))
-
-    def remove(self) -> Any:
-        with self.__mutex:
-            mp_item = self.__queue.get()
-        return mp_item.item if mp_item else None
-
-    def empty(self) -> bool:
-        with self.__mutex:
-            return self.__queue.empty()
 
 
 class StoppedThread(Thread):
