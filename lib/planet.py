@@ -12,7 +12,6 @@ class PlanetType(IntEnum):
 
 
 class Planet(object):
-    __UNITS_PER_PLANET_TYPE_COUNT = 50
     cache: Dict[int, 'Planet'] = {}
 
     def __init__(self, coords, planet_type, owner=None, units_count=None):

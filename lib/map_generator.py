@@ -160,6 +160,7 @@ class MapGenerator(object):
             self.__planets += subplanets
 
     def __generate_separated_planets(self):
+        separated_max_count = self.__max_planet_count - len(self.__planets)
         separated_num = 0
         try_num = 0
         separated = []
@@ -169,10 +170,7 @@ class MapGenerator(object):
             y = random.randint(-self.__screen_height / 2, self.__screen_height / 2)
 
             check = True
-            new_planet = Planet(
-                Coords(x, y),
-                self.__get_random_planet_type()
-            )
+            new_planet = Planet(Coords(x, y), self.__get_random_planet_type())
 
             if abs(new_planet.coords.x) > self.__screen_length / 2 - self.__planet_free_space_radius or (
                 abs(new_planet.coords.y) > self.__screen_height / 2 - self.__planet_free_space_radius
@@ -188,7 +186,6 @@ class MapGenerator(object):
 
             for i in separated:
                 if new_planet.coords.calc_distance(i.coords) < 2 * self.__planet_free_space_radius:
-
                     check = False
                     break
 
@@ -197,9 +194,13 @@ class MapGenerator(object):
                 try_num = 0
             else:
                 try_num += 1
+                if try_num > self.__max_gen_try_separated_planets:
+                    break
                 continue
 
             separated_num += 1
+            if separated_num >= separated_max_count:
+                break
 
         self.__planets += separated
 
