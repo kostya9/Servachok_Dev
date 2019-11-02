@@ -2,7 +2,7 @@ import random
 from enum import IntEnum
 from typing import Dict
 
-from utils import ID_GENERATOR
+from utils import Coords, ID_GENERATOR
 
 
 class PlanetType(IntEnum):
@@ -14,14 +14,13 @@ class PlanetType(IntEnum):
 class Planet(object):
     cache: Dict[int, 'Planet'] = {}
 
-    def __init__(self, coords, planet_type, owner=None, units_count=None):
+    def __init__(self, coords: Coords, planet_type: PlanetType, owner: int = None, units_count: int = None):
         self.coords = coords
         self.type = planet_type
 
-        if units_count:
-            self.units_count = units_count
-        else:
-            self.units_count = random.randint(0, 40) * planet_type.value
+        if units_count is None:
+            units_count = random.randint(0, 40) * planet_type.value
+        self.units_count = units_count
 
         self.owner = owner
         self.__id = next(ID_GENERATOR)

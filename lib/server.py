@@ -7,11 +7,11 @@ import socket
 import struct
 from typing import Dict, List, Union
 
-from lib.events import GameEvent, ClientEvent, ServerEvent, ClientEventName, ServerEventName
+from lib.events import ClientEvent, ClientEventName, GameEvent, ServerEvent, ServerEventName
 from lib.map_generator import MapGenerator
-from lib.planet import Planet
 from lib.player import Player
-from utils import EventPriorityQueue, StoppedThread, ID_GENERATOR, Config
+from lib.planet import Planet
+from utils import Config, EventPriorityQueue, ID_GENERATOR, StoppedThread
 
 
 CFG = Config()
@@ -165,7 +165,7 @@ class Server(object):
             self.readiness = True
 
             self.__notify(ServerEventName.MAP_INIT, {
-                'map': game_map
+                'map': game_map,
             })
 
     def __on_event_rendered(self, player: Player):
@@ -201,7 +201,7 @@ class Server(object):
                 player.object_ids += punits[planet_id]
 
         self.__notify(event.name, {
-            'selected': punits
+            'selected': punits,
         })
 
     def __on_event_add_hp(self, event: GameEvent, player: Player):

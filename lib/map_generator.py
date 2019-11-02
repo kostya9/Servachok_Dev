@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from lib.planet import Planet, PlanetType
-from utils import Coords, Config
+from utils import Config, Coords
 
 CFG = Config()
 
@@ -22,7 +22,7 @@ class MapGenerator(object):
     LENGTH_MULTIPLIER = int(CFG['Screen']['length_multiplier'])
     HEIGHT_MULTIPLIER = int(CFG['Screen']['height_multiplier'])
 
-    def __init__(self, screen_scale_multiplier=SCREEN_MULTIPLIER, planet_free_space_radius=None):
+    def __init__(self, screen_scale_multiplier: float = SCREEN_MULTIPLIER, planet_free_space_radius: float = None):
         self.__screen_length = self.LENGTH_MULTIPLIER * screen_scale_multiplier
         self.__screen_height = self.HEIGHT_MULTIPLIER * screen_scale_multiplier
         self.__border_angle = math.atan(self.HEIGHT_MULTIPLIER / self.LENGTH_MULTIPLIER) * 180 / math.pi
@@ -111,14 +111,15 @@ class MapGenerator(object):
         min_rad = min(planets, key=lambda x: x[0])
         self.__start_position_radius = min_rad[0] - self.__planet_free_space_radius
 
-        for i in planets:
-            i[1].coords.x = int(self.__start_position_radius * math.cos(i[2] * math.pi / 180))
-            i[1].coords.y = int(self.__start_position_radius * math.sin(i[2] * math.pi / 180))
-            i[0] = self.__start_position_radius
+        for p in planets:
+            p[1].coords.x = int(self.__start_position_radius * math.cos(p[2] * math.pi / 180))
+            p[1].coords.y = int(self.__start_position_radius * math.sin(p[2] * math.pi / 180))
+            p[0] = self.__start_position_radius
 
         self.__planets += [planet[1] for planet in planets]
 
-    def __get_random_planet_type(self):
+    @staticmethod
+    def __get_random_planet_type() -> PlanetType:
         """ выбирает тип планеты из спика в зависимости от веса элемента """
 
         return random.choices([PlanetType.SMALL, PlanetType.MEDIUM, PlanetType.BIG], [600, 300, 200])[0]
@@ -180,7 +181,7 @@ class MapGenerator(object):
         try_num = 0
         separated = []
 
-        while True:
+        while (try_num <= self.__max_gen_try_separated_planets) and (separated_num < separated_max_count):
             x = random.randint(-self.__screen_length / 2, self.__screen_length / 2)
             y = random.randint(-self.__screen_height / 2, self.__screen_height / 2)
 
@@ -194,13 +195,13 @@ class MapGenerator(object):
 
             subradius = self.__start_position_radius * math.sin(math.pi / self.__players)
 
-            for i in self.__planets[:self.__players]:
-                if new_planet.coords.calc_distance(i.coords) < subradius:
+            for p in self.__planets[:self.__players]:
+                if new_planet.coords.calc_distance(p.coords) < subradius:
                     check = False
                     break
 
-            for i in separated:
-                if new_planet.coords.calc_distance(i.coords) < 2 * self.__planet_free_space_radius:
+            for s in separated:
+                if new_planet.coords.calc_distance(s.coords) < 2 * self.__planet_free_space_radius:
                     check = False
                     break
 
@@ -209,13 +210,9 @@ class MapGenerator(object):
                 try_num = 0
             else:
                 try_num += 1
-                if try_num > self.__max_gen_try_separated_planets:
-                    break
                 continue
 
             separated_num += 1
-            if separated_num >= separated_max_count:
-                break
 
         self.__planets += separated
 
