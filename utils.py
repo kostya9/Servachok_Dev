@@ -1,17 +1,16 @@
 from queue import PriorityQueue
 from threading import Event, Lock, Thread
 
-from events import GameEvent, EventName
+from events import EventName, GameEvent
 
 
 class PriorityQueueEvent(object):
-    def __init__(self, event: GameEvent, priority: int):
+    def __init__(self, event: GameEvent, priority: int = None):
         self.event = event
 
         if priority is None:
-            self.priority = self.__priority_factory()
-        else:
-            self.priority = priority
+            priority = self.__priority_factory()
+        self.priority = priority
 
     def __priority_factory(self) -> int:
         if self.event.name == EventName.MOVE:
