@@ -46,5 +46,7 @@ class ClientEvent(GameEvent):
 
 class ServerEvent(GameEvent):
     def request(self) -> bytes:
+        """ формирует json строку ответа в байтах (string_size (4bytes) + string)"""
+
         string = json.dumps({'name': self.name, **self.payload})
         return struct.pack('i', len(string)) + string.encode('utf-8')

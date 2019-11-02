@@ -1,3 +1,7 @@
+"""
+Модуль сервера
+"""
+
 import select
 import socket
 import struct
@@ -31,34 +35,47 @@ class Server(object):
     def __init__(self, port: int = PORT, max_client_count: int = MAX_CLIENT_COUNT):
         self.server = create_tcp_server((self.HOST, port), max_client_count)
         self.started = True
+        # список клиентских сокетов
         self.clients: List[socket.socket] = []
         self.__max_clients_count = max_client_count
+        # словарь с информацией про игрока (ключ - сокет, значение - обьект игрока)
         self.players: Dict[socket.socket, Player] = {}
         self.next_player_id = 0
         self.readiness = False
         self.game_started = False
 
+        # очередь клиентских событий
         self.__handler_queue = EventPriorityQueue()
+        # очередь событий на отправку клиентам
         self.__sender_queue = EventPriorityQueue()
 
+        # потоки для функций приема событий, их обработки и отправки
         self.__threads: List[StoppedThread] = []
 
     def __start_thread(self, name, callback, args=None):
+        """ запуск потока """
+
         t = StoppedThread(name=name, target=callback, args=args)
         self.__threads.append(t)
         t.start()
 
     def start(self):
+        """ запуск всех потоков сервера """
+
         self.__start_thread(name='receiver', callback=self.__receiver, args=())
         self.__start_thread(name='handler', callback=self.__handler, args=())
         self.__start_thread(name='sender', callback=self.__sender, args=())
 
     def stop(self):
+        """ остановка всех потоков сервера """
+
         for thread in self.__threads:
             thread.stop()
             thread.join()
 
     def __wait_for_client(self, server_sock):
+        """ ожидание подключения клиента """
+
         if not self.game_started and not self.readiness and len(self.clients) < self.__max_clients_count:
             client, address = server_sock.accept()
             client.setblocking(0)
@@ -74,11 +91,19 @@ class Server(object):
             })
 
     def __remove_client(self, client_sock):
+        """ удаляет клиентов со списка и закрывает соединение """
+
         self.clients.remove(client_sock)
         del self.players[client_sock]
         client_sock.close()
 
     def __wait_for_client_data(self, client_sock):
+        """
+        получает данные клиента,
+        создает экземпляр события,
+        добавляет в очередь
+        """
+
         data_size = client_sock.recv(struct.calcsize('i'))
 
         if data_size:
@@ -95,6 +120,8 @@ class Server(object):
             self.__remove_client(client_sock)
 
     def __receiver(self):
+        """ слушает изменения в сокетах """
+
         readable, *_ = select.select([self.server, *self.clients], [], [], self.RECEIVER_TIMEOUT)
 
         for sock in readable:
@@ -104,6 +131,8 @@ class Server(object):
                 self.__wait_for_client_data(sock)
 
     def __sender(self):
+        """ рассылает данные с очереди """
+
         if not self.__sender_queue.empty():
             event = self.__sender_queue.remove()
 
@@ -111,9 +140,13 @@ class Server(object):
                 client.send(event.request())
 
     def __notify(self, name: str, args: dict):
+        """ создает и добавляет событие в очередь на отправку """
+
         self.__sender_queue.insert(ServerEvent(name, args))
 
     def __on_event_ready(self, event: GameEvent, player: Player):
+        """ обработчик события: ready """
+
         player.ready = event.payload['ready']
 
         self.__notify(event.name, {
@@ -136,6 +169,8 @@ class Server(object):
             })
 
     def __on_event_rendered(self, player: Player):
+        """ обработчик события: rendered """
+
         player.rendered = True
 
         if all(player.rendered for player in self.players.values()):
@@ -143,10 +178,14 @@ class Server(object):
             self.game_started = True
 
     def __on_event_move(self, event: GameEvent, player: Player):
+        """ обработчик события: move """
+
         if int(event.payload['unit_id']) in player.object_ids:
             self.__notify(event.name, event.payload)
 
     def __on_event_select(self, event: GameEvent, player: Player):
+        """ обработчик события: select """
+
         planet_ids = event.payload['from']
         percentage = event.payload['percentage']
 
@@ -166,6 +205,8 @@ class Server(object):
         })
 
     def __on_event_add_hp(self, event: GameEvent, player: Player):
+        """ обработчик события: add_hp """
+
         planet_id = int(event.payload['planet_id'])
         hp_count = int(event.payload['hp_count'])
 
@@ -176,6 +217,8 @@ class Server(object):
             self.__notify(event.name, event.payload)
 
     def __check_game_over(self):
+        """ проверяет окончание игры """
+
         active_players = []
 
         for player in self.players.values():
@@ -198,6 +241,8 @@ class Server(object):
             self.clients = []
 
     def __on_event_damage(self, event: GameEvent, player: Player):
+        """ обработчик события: damage """
+
         planet_id = int(event.payload['planet_id'])
         unit_id = int(event.payload['unit_id'])
         hp_count = int(event.payload.get('hp_count', 1))
@@ -227,6 +272,8 @@ class Server(object):
         self.__check_game_over()
 
     def __handler(self):
+        """ обработчик событий """
+
         if not self.__handler_queue.empty():
             event = self.__handler_queue.remove()
             player = event.payload['player']

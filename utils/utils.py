@@ -4,7 +4,21 @@ from threading import Event, Lock, Thread
 from lib.events import GameEvent, EventName
 
 
+def __generate_id() -> int:
+    """ генератор id """
+
+    id_ = 1
+    while True:
+        yield id_
+        id_ += 1
+
+
+ID_GENERATOR = __generate_id()
+
+
 class PriorityQueueEvent(object):
+    """ элемент очереди событий по максимальному приоритету """
+
     def __init__(self, event: GameEvent, priority: int):
         self.event = event
 
@@ -26,6 +40,8 @@ class PriorityQueueEvent(object):
 
 
 class EventPriorityQueue(object):
+    """ очередь событий по максимальному приоритету """
+
     def __init__(self):
         self.__queue = PriorityQueue()
         self.__mutex = Lock()
@@ -45,17 +61,9 @@ class EventPriorityQueue(object):
             return self.__queue.empty()
 
 
-def __generate_id() -> int:
-    id_ = 1
-    while True:
-        yield id_
-        id_ += 1
-
-
-ID_GENERATOR = __generate_id()
-
-
 class Coords(object):
+    """ координата точки """
+
     def __init__(self, x: int = 0, y: int = 0):
         self.x = x
         self.y = y
@@ -77,6 +85,8 @@ class Coords(object):
 
 
 class StoppedThread(Thread):
+    """ обертка (wrapper) для ручной остановки потоков """
+
     def __init__(self, target=None, name=None, args=(), **kwargs):
         self._target = target
         self._args = args

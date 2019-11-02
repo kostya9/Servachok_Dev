@@ -1,4 +1,8 @@
-# screen size 16:9
+"""
+Модуль генерации карты
+screen size 16:9
+"""
+
 import math
 import random
 from typing import List
@@ -35,6 +39,8 @@ class MapGenerator(object):
             self.__planet_free_space_radius = round(50 / 120 * screen_scale_multiplier)
 
     def run(self, players_ids: List[int]) -> List[Planet]:
+        """ запускает генерацию карты """
+
         self.__players = len(players_ids)
         self.__generate_start_position(players_ids)
         self.__generate_subplanets()
@@ -42,11 +48,12 @@ class MapGenerator(object):
         return self.__planets
 
     def __generate_start_position(self, players_ids: List[int]):
+        """ генерирует начальные планеты игроков """
+
         players_count = len(players_ids)
-
         planets = []
-
         alpha = random.randint(0, int(360 / players_count))
+
         for player_id in players_ids:
             coord = Coords()
             tang = math.tan(alpha * math.pi / 180)
@@ -112,15 +119,21 @@ class MapGenerator(object):
         self.__planets += [planet[1] for planet in planets]
 
     def __get_random_planet_type(self):
+        """ выбирает тип планеты из спика в зависимости от веса элемента """
+
         return random.choices([PlanetType.SMALL, PlanetType.MEDIUM, PlanetType.BIG], [600, 300, 200])[0]
 
     def __generate_subplanets(self):
+        """ генерирует планеты вокруг планет игроков """
+
         subplanet_max_count = round((self.__max_planet_count - self.__players - 1) * 0.6 / self.__players)
+
         for planet in self.__planets[:self.__players]:
 
             subplanet_num = 0
             try_num = 0
             subplanets = []
+
             while (try_num <= self.__max_gen_try_subplanets) and (subplanet_num < subplanet_max_count):
                 sub_alpha = random.randint(0, 359)
                 sub_radius = random.randint(
@@ -138,7 +151,7 @@ class MapGenerator(object):
                 )
 
                 if (abs(new_planet.coords.x) > self.__screen_length / 2 - self.__planet_free_space_radius) or (
-                    abs(new_planet.coords.y) > self.__screen_height / 2 - self.__planet_free_space_radius
+                        abs(new_planet.coords.y) > self.__screen_height / 2 - self.__planet_free_space_radius
                 ):
                     try_num += 1
                     continue
@@ -160,6 +173,8 @@ class MapGenerator(object):
             self.__planets += subplanets
 
     def __generate_separated_planets(self):
+        """ генерирует оставшиеся планеты (добавляет планеты в пустых местах карты, теоретически) """
+
         separated_max_count = self.__max_planet_count - len(self.__planets)
         separated_num = 0
         try_num = 0
@@ -173,7 +188,7 @@ class MapGenerator(object):
             new_planet = Planet(Coords(x, y), self.__get_random_planet_type())
 
             if abs(new_planet.coords.x) > self.__screen_length / 2 - self.__planet_free_space_radius or (
-                abs(new_planet.coords.y) > self.__screen_height / 2 - self.__planet_free_space_radius
+                    abs(new_planet.coords.y) > self.__screen_height / 2 - self.__planet_free_space_radius
             ):
                 check = False
 
@@ -205,6 +220,8 @@ class MapGenerator(object):
         self.__planets += separated
 
     def display(self):
+        """ отображает карту (при тестировании) """
+
         coords = []
 
         plt.figure()
