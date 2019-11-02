@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import json
 import struct
 
@@ -24,13 +25,14 @@ class ServerEventName(EventName):
     GAME_OVER = 'gameover'
 
 
-class GameEvent(object):
+class GameEvent(ABC):
     def __init__(self, name: EventName, kwargs: dict):
         self.name = name
         self.payload = kwargs
 
+    @abstractmethod
     def request(self) -> bytes:
-        raise NotImplementedError
+        pass
 
 
 class ClientEvent(GameEvent):
