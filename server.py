@@ -3,7 +3,7 @@ import socket
 import struct
 from typing import Callable, Dict, List, Union
 
-from events import ClientEvent, ClientEventName, ServerEvent, ServerEventName
+from events import ClientEvent, ClientEventName, GameEvent, ServerEvent, ServerEventName
 from map_generator import MapGenerator
 from planet import Planet
 from player import Player
@@ -111,7 +111,7 @@ class Server(object):
     def __notify(self, name: str, args: dict):
         self.__sender_queue.insert(ServerEvent(name, args))
 
-    def __on_event_ready(self, event: ClientEvent, player: Player):
+    def __on_event_ready(self, event: GameEvent, player: Player):
         player.ready = event.payload['ready']
 
         self.__notify(event.name, {
@@ -140,11 +140,11 @@ class Server(object):
             self.__notify(ServerEventName.GAME_STARTED, {})
             self.game_started = True
 
-    def __on_event_move(self, event: ClientEvent, player: Player):
+    def __on_event_move(self, event: GameEvent, player: Player):
         if int(event.payload['unit_id']) in player.object_ids:
             self.__notify(event.name, event.payload)
 
-    def __on_event_select(self, event: ClientEvent, player: Player):
+    def __on_event_select(self, event: GameEvent, player: Player):
         planet_ids = event.payload['from']
         percentage = event.payload['percentage']
 
@@ -163,7 +163,7 @@ class Server(object):
             'selected': punits
         })
 
-    def __on_event_add_hp(self, event: ClientEvent, player: Player):
+    def __on_event_add_hp(self, event: GameEvent, player: Player):
         planet_id = int(event.payload['planet_id'])
         hp_count = int(event.payload['hp_count'])
 
@@ -195,7 +195,7 @@ class Server(object):
             self.players = {}
             self.clients = []
 
-    def __on_event_damage(self, event: ClientEvent, player: Player):
+    def __on_event_damage(self, event: GameEvent, player: Player):
         planet_id = int(event.payload['planet_id'])
         unit_id = int(event.payload['unit_id'])
         hp_count = int(event.payload.get('hp_count', 1))
