@@ -3,7 +3,7 @@ import socket
 import struct
 from typing import Dict, List, Union
 
-from lib.events import ClientEvent, ServerEvent, ClientEventName, ServerEventName
+from lib.events import GameEvent, ClientEvent, ServerEvent, ClientEventName, ServerEventName
 from lib.map_generator import MapGenerator
 from lib.planet import Planet
 from lib.player import Player
@@ -113,120 +113,134 @@ class Server(object):
     def __notify(self, name: str, args: dict):
         self.__sender_queue.insert(ServerEvent(name, args))
 
+    def __on_event_ready(self, event: GameEvent, player: Player):
+        player.ready = event.payload['ready']
+
+        self.__notify(event.name, {
+            'player': player.id,
+            'ready': event.payload['ready'],
+        })
+
+        all_ready = all(player.ready for player in self.players.values())
+
+        if all_ready and len(self.players) > 1:
+            gen = MapGenerator()
+            map_ = gen.run([player.id for player in self.players.values()])
+            gen.display()
+            game_map = [planet.get_dict() for planet in map_]
+
+            self.readiness = True
+
+            self.__notify(ServerEventName.MAP_INIT, {
+                'map': game_map
+            })
+
+    def __on_event_rendered(self, player: Player):
+        player.rendered = True
+
+        if all(player.rendered for player in self.players.values()):
+            self.__notify(ServerEventName.GAME_STARTED, {})
+            self.game_started = True
+
+    def __on_event_move(self, event: GameEvent, player: Player):
+        if int(event.payload['unit_id']) in player.object_ids:
+            self.__notify(event.name, event.payload)
+
+    def __on_event_select(self, event: GameEvent, player: Player):
+        planet_ids = event.payload['from']
+        percentage = event.payload['percentage']
+
+        punits = {}
+
+        for planet_id in planet_ids:
+            planet_id = int(planet_id)
+
+            if Planet.cache[planet_id].owner == player.id:
+                new_ships_count = round(Planet.cache[planet_id].units_count * int(percentage) / 100.0)
+                Planet.cache[planet_id].units_count -= new_ships_count
+                punits[planet_id] = [next(ID_GENERATOR) for _ in range(new_ships_count)]
+                player.object_ids += punits[planet_id]
+
+        self.__notify(event.name, {
+            'selected': punits
+        })
+
+    def __on_event_add_hp(self, event: GameEvent, player: Player):
+        planet_id = int(event.payload['planet_id'])
+        hp_count = int(event.payload['hp_count'])
+
+        planet = Planet.cache[planet_id]
+
+        if planet.owner == player.id:
+            planet.units_count += hp_count
+            self.__notify(event.name, event.payload)
+
+    def __check_game_over(self):
+        active_players = []
+
+        for player in self.players.values():
+            if len(player.object_ids) > 0:
+                for planet in Planet.cache.values():
+                    if planet.owner == player.id:
+                        active_players.append(player.id)
+                        break
+            if len(active_players) >= 2:
+                break
+        else:
+            self.__notify(ServerEventName.GAME_OVER, {
+                'winner': active_players[0],
+            })
+
+            self.readiness = False
+            self.game_started = False
+
+            self.players = {}
+            self.clients = []
+
+    def __on_event_damage(self, event: GameEvent, player: Player):
+        planet_id = int(event.payload['planet_id'])
+        unit_id = int(event.payload['unit_id'])
+        hp_count = int(event.payload.get('hp_count', 1))
+
+        planet = Planet.cache[planet_id]
+
+        if unit_id in player.object_ids:
+            if planet.owner == player.id:
+                planet.units_count += hp_count
+            else:
+                planet.units_count -= hp_count
+                if planet.units_count < 0:
+                    planet.owner = player.id
+                    planet.units_count = abs(planet.units_count)
+
+            player.object_ids.remove(unit_id)
+
+            self.__notify(event.name, {
+                'planet_change': {
+                    'id': planet_id,
+                    'units_count': planet.units_count,
+                    'owner': planet.owner,
+                },
+                'unit_id': unit_id,
+            })
+
+        self.__check_game_over()
+
     def __handler(self):
         if not self.__handler_queue.empty():
             event = self.__handler_queue.remove()
             player = event.payload['player']
 
             if event.name == ClientEventName.READY:
-                player.ready = event.payload['ready']
-
-                self.__notify(event.name, {
-                    'player': player.id,
-                    'ready': event.payload['ready'],
-                })
-
-                all_ready = all(player.ready for player in self.players.values())
-
-                if all_ready and len(self.players) > 1:
-                    gen = MapGenerator()
-                    map_ = gen.run([player.id for player in self.players.values()])
-                    gen.display()
-                    game_map = [planet.get_dict() for planet in map_]
-
-                    self.readiness = True
-
-                    self.__notify(ServerEventName.MAP_INIT, {
-                        'map': game_map
-                    })
-
+                self.__on_event_ready(event, player)
             elif event.name == ClientEventName.RENDERED:
-                player.rendered = True
-
-                if all(player.rendered for player in self.players.values()):
-                    self.__notify(ServerEventName.GAME_STARTED, {})
-                    self.game_started = True
-
-            if self.game_started:
+                self.__on_event_rendered(player)
+            elif self.game_started:
                 if event.name == ClientEventName.MOVE:
-                    if int(event.payload['unit_id']) in player.object_ids:
-                        self.__notify(event.name, event.payload)
-
+                    self.__on_event_move(event, player)
                 elif event.name == ClientEventName.SELECT:
-                    planet_ids = event.payload['from']
-                    percentage = event.payload['percentage']
-
-                    punits = {}
-
-                    for planet_id in planet_ids:
-                        planet_id = int(planet_id)
-
-                        if Planet.cache[planet_id].owner == player.id:
-                            new_ships_count = round(Planet.cache[planet_id].units_count * int(percentage) / 100.0)
-                            Planet.cache[planet_id].units_count -= new_ships_count
-                            punits[planet_id] = [next(ID_GENERATOR) for _ in range(new_ships_count)]
-                            player.object_ids += punits[planet_id]
-
-                    self.__notify(event.name, {
-                        'selected': punits
-                    })
-
+                    self.__on_event_select(event, player)
                 elif event.name == ClientEventName.ADD_HP:
-                    planet_id = int(event.payload['planet_id'])
-                    hp_count = int(event.payload['hp_count'])
-
-                    planet = Planet.cache[planet_id]
-
-                    if planet.owner == player.id:
-                        planet.units_count += hp_count
-                        self.__notify(event.name, event.payload)
-
+                    self.__on_event_add_hp(event, player)
                 elif event.name == ClientEventName.DAMAGE:
-                    planet_id = int(event.payload['planet_id'])
-                    unit_id = int(event.payload['unit_id'])
-                    hp_count = int(event.payload.get('hp_count', 1))
-
-                    planet = Planet.cache[planet_id]
-
-                    if unit_id in player.object_ids:
-                        if planet.owner == player.id:
-                            planet.units_count += hp_count
-                        else:
-                            planet.units_count -= hp_count
-                            if planet.units_count < 0:
-                                planet.owner = player.id
-                                planet.units_count = abs(planet.units_count)
-
-                        player.object_ids.remove(unit_id)
-
-                        self.__notify(event.name, {
-                            'planet_change': {
-                                'id': planet_id,
-                                'units_count': planet.units_count,
-                                'owner': planet.owner,
-                            },
-                            'unit_id': unit_id,
-                        })
-
-                    # check game over
-
-                    active_players = []
-
-                    for player in self.players.values():
-                        if len(player.object_ids) > 0:
-                            for planet in Planet.cache.values():
-                                if planet.owner == player.id:
-                                    active_players.append(player.id)
-                                    break
-                        if len(active_players) >= 2:
-                            break
-                    else:
-                        self.__notify(ServerEventName.GAME_OVER, {
-                            'winner': active_players[0],
-                        })
-
-                        self.readiness = False
-                        self.game_started = False
-
-                        self.players = {}
-                        self.clients = []
+                    self.__on_event_damage(event, player)
