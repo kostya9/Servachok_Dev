@@ -26,7 +26,7 @@ class ServerEventName(EventName):
 
 
 class GameEvent(ABC):
-    def __init__(self, name: EventName, kwargs: dict):
+    def __init__(self, name: str, kwargs: dict):
         self.name = name
         self.payload = kwargs
 

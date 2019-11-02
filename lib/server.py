@@ -110,7 +110,7 @@ class Server(object):
             for client in self.clients:
                 client.send(event.request())
 
-    def __notify(self, name: ServerEventName, args: dict):
+    def __notify(self, name: str, args: dict):
         self.__sender_queue.insert(ServerEvent(name, args))
 
     def __handler(self):
