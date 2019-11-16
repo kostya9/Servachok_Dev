@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import json
 import struct
 
-from lib.player import Player
+from utils.player import Player
 
 
 class EventName(object):

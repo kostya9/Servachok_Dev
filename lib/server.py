@@ -7,9 +7,9 @@ import socket
 import struct
 from typing import Dict, List, Union
 
-from lib.events import ClientEvent, ClientEventName, GameEvent, ServerEvent, ServerEventName
+from utils.events import ClientEvent, ClientEventName, GameEvent, ServerEvent, ServerEventName
 from lib.map_generator import MapGenerator
-from lib.player import Player
+from utils.player import Player
 from lib.planet import Planet
 from utils import Config, EventPriorityQueue, ID_GENERATOR, StoppedThread
 

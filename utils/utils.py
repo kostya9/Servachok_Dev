@@ -1,7 +1,7 @@
 from queue import PriorityQueue
 from threading import Event, Lock, Thread
 
-from lib.events import GameEvent, EventName
+from utils.events import GameEvent, EventName
 
 
 def __generate_id() -> int:
