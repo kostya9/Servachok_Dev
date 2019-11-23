@@ -90,6 +90,10 @@ class Server(object):
                 'player': player.info()
             })
 
+            self.__notify(ServerEventName.PLAYER_LIST, {
+                'players': [pl.info() for pl in self.players.values()]
+            }, receivers=client)
+
     def __remove_client(self, client_sock):
         """ удаляет клиентов со списка и закрывает соединение """
 
@@ -136,11 +140,18 @@ class Server(object):
         if not self.__sender_queue.empty():
             event = self.__sender_queue.remove()
 
-            for client in self.clients:
+            receivers = event.payload.pop("receivers", self.clients)
+
+            for client in receivers:
                 client.send(event.request())
 
-    def __notify(self, name: str, args: dict):
+    def __notify(self, name: str, args: dict, receivers=None):
         """ создает и добавляет событие в очередь на отправку """
+
+        if receivers:
+            if not isinstance(receivers, list):
+                receivers = [receivers, ]
+            args['receivers'] = receivers
 
         self.__sender_queue.insert(ServerEvent(name, args))
 
