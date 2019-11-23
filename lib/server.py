@@ -7,12 +7,11 @@ import socket
 import struct
 from typing import Dict, List, Union
 
-from utils.events import ClientEvent, ClientEventName, GameEvent, ServerEvent, ServerEventName
 from lib.map_generator import MapGenerator
-from utils.player import Player
 from lib.planet import Planet
 from utils import Config, EventPriorityQueue, ID_GENERATOR, StoppedThread
-
+from utils.events import ClientEvent, ClientEventName, GameEvent, ServerEvent, ServerEventName
+from utils.player import Player
 
 CFG = Config()
 
@@ -80,19 +79,21 @@ class Server(object):
             client, address = server_sock.accept()
             client.setblocking(0)
 
-            self.clients.append(client)
             self.next_player_id += 1
 
             player = Player(address, self.next_player_id)
-            self.players[client] = player
+
+            self.__notify(ServerEventName.PLAYER_INIT, {
+                'players': [pl.info() for pl in self.players.values()],
+                "id": player.id
+            }, receivers=client)
 
             self.__notify(ServerEventName.CONNECT, {
                 'player': player.info()
-            })
+            }, receivers=[cl for cl in self.clients])
 
-            self.__notify(ServerEventName.PLAYER_LIST, {
-                'players': [pl.info() for pl in self.players.values()]
-            }, receivers=client)
+            self.clients.append(client)
+            self.players[client] = player
 
     def __remove_client(self, client_sock):
         """ удаляет клиентов со списка и закрывает соединение """
@@ -107,20 +108,22 @@ class Server(object):
         создает экземпляр события,
         добавляет в очередь
         """
+        try:
+            data_size = client_sock.recv(struct.calcsize('i'))
 
-        data_size = client_sock.recv(struct.calcsize('i'))
+            if data_size:
+                data_size = struct.unpack('i', data_size)[0]
+                event = client_sock.recv(data_size)
 
-        if data_size:
-            data_size = struct.unpack('i', data_size)[0]
-            event = client_sock.recv(data_size)
-
-            if event:
-                player = self.players[client_sock]
-                event = ClientEvent(player, event)
-                self.__handler_queue.insert(event)
+                if event:
+                    player = self.players[client_sock]
+                    event = ClientEvent(player, event)
+                    self.__handler_queue.insert(event)
+                else:
+                    self.__remove_client(client_sock)
             else:
                 self.__remove_client(client_sock)
-        else:
+        except ConnectionResetError:
             self.__remove_client(client_sock)
 
     def __receiver(self):
@@ -148,7 +151,7 @@ class Server(object):
     def __notify(self, name: str, args: dict, receivers=None):
         """ создает и добавляет событие в очередь на отправку """
 
-        if receivers:
+        if receivers is not None:
             if not isinstance(receivers, list):
                 receivers = [receivers, ]
             args['receivers'] = receivers

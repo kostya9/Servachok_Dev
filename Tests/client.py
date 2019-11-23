@@ -67,6 +67,7 @@ while True:
             print(event)
             if event['name'] == 'mapinit':
                 display(event['map'])
+                break
         else:
             client_socket.close()
     else:
