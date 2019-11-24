@@ -173,7 +173,6 @@ class Server(object):
         if all_ready and len(self.players) > 1:
             gen = MapGenerator()
             map_ = gen.run([player.id for player in self.players.values()])
-            gen.display()
             game_map = [planet.get_dict() for planet in map_]
 
             self.readiness = True

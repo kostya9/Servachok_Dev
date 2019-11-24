@@ -15,7 +15,6 @@ def display(planets):
     """
     only for test
     """
-    print(planets)
     coords = []
 
     plt.figure()
