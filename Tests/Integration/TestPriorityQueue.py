@@ -6,7 +6,7 @@ from typing import List
 
 class ProducerThread(Thread):
     def __init__(self, event_queue: 'PriorityQueueEvent', message_queue: Queue, events: List[EventPriorityQueue]):
-        Thread.__init__()
+        Thread.__init__(self)
         self.event_queue_ref = event_queue
         self.message_queue_ref = message_queue
         self.event_list = events
