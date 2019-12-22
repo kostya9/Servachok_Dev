@@ -98,9 +98,15 @@ class Server(object):
     def __remove_client(self, client_sock):
         """ удаляет клиентов со списка и закрывает соединение """
 
+        player = self.players[client_sock]
+
         self.clients.remove(client_sock)
         del self.players[client_sock]
         client_sock.close()
+
+        self.__notify(ServerEventName.DISCONNECT, {
+            'player': player.info(),
+        })
 
     def __wait_for_client_data(self, client_sock):
         """

@@ -20,6 +20,7 @@ class ClientEventName(EventName):
 
 class ServerEventName(EventName):
     CONNECT = 'connect'
+    DISCONNECT = 'disconnect'
     PLAYER_INIT = 'player_init'
     MAP_INIT = 'mapinit'
     GAME_STARTED = 'game_started'
