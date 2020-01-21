@@ -198,9 +198,16 @@ class Server(object):
 
     def __on_event_move(self, event: GameEvent, player: Player):
         """ обработчик события: move """
+        unit_id = event.payload['unit_id']
+        x = event.payload['x']
+        y = event.payload['y']
 
-        if int(event.payload['unit_id']) in player.object_ids:
-            self.__notify(event.name, event.payload)
+        if int(unit_id) in player.object_ids:
+            self.__notify(event.name, {
+                'unit_id': unit_id,
+                'x': x,
+                'y': y
+            })
 
     def __on_event_select(self, event: GameEvent, player: Player):
         """ обработчик события: select """
@@ -233,7 +240,10 @@ class Server(object):
 
         if planet.owner == player.id:
             planet.units_count += hp_count
-            self.__notify(event.name, event.payload)
+            self.__notify(event.name, {
+                'planet_id': planet_id,
+                'hp_count': hp_count
+            })
 
     def __check_game_over(self):
         """ проверяет окончание игры """
