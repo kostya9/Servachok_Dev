@@ -115,6 +115,7 @@ class Server(object):
         добавляет в очередь
         """
         try:
+            client_sock.setblocking(1)
             data_size = client_sock.recv(struct.calcsize('i'))
 
             if data_size:
@@ -134,6 +135,8 @@ class Server(object):
         except ConnectionResetError:
             print('ConnectionResetError')
             self.__remove_client(client_sock)
+
+        client_sock.setblocking(0)
 
     def __receiver(self):
         """ слушает изменения в сокетах """
