@@ -126,10 +126,13 @@ class Server(object):
                     event = ClientEvent(player, event)
                     self.__handler_queue.insert(event)
                 else:
+                    print('no evnt')
                     self.__remove_client(client_sock)
             else:
+                print('no dat size')
                 self.__remove_client(client_sock)
         except ConnectionResetError:
+            print('ConnectionResetError')
             self.__remove_client(client_sock)
 
     def __receiver(self):
@@ -251,14 +254,15 @@ class Server(object):
         active_players = []
 
         for player in self.players.values():
-            if len(player.object_ids) > 0:
-                for planet in Planet.cache.values():
-                    if planet.owner == player.id:
-                        active_players.append(player.id)
-                        break
+            for planet in Planet.cache.values():
+                if planet.owner == player.id:
+                    active_players.append(player.id)
+                    break
+                
             if len(active_players) >= 2:
                 break
         else:
+            print('over')
             self.__notify(ServerEventName.GAME_OVER, {
                 'winner': active_players[0],
             })
