@@ -121,6 +121,7 @@ class Server(object):
             if data_size:
                 data_size = struct.unpack('i', data_size)[0]
                 event = client_sock.recv(data_size)
+                client_sock.setblocking(0)
 
                 if event:
                     player = self.players[client_sock]
@@ -136,7 +137,6 @@ class Server(object):
             print('ConnectionResetError')
             self.__remove_client(client_sock)
 
-        client_sock.setblocking(0)
 
     def __receiver(self):
         """ слушает изменения в сокетах """
