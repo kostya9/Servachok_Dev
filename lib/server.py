@@ -268,7 +268,7 @@ class Server(object):
             print('over')
             self.__notify(ServerEventName.GAME_OVER, {
                 'winner': active_players[0],
-            })
+            }, self.clients)
 
             self.readiness = False
             self.game_started = False
