@@ -12,6 +12,7 @@ from lib.planet import Planet
 from utils import Config, EventPriorityQueue, ID_GENERATOR, StoppedThread
 from utils.events import ClientEvent, ClientEventName, GameEvent, ServerEvent, ServerEventName
 from utils.player import Player
+import time
 
 CFG = Config()
 
@@ -269,6 +270,8 @@ class Server(object):
             self.__notify(ServerEventName.GAME_OVER, {
                 'winner': active_players[0],
             }, self.clients)
+
+            time.sleep(2)
 
             self.readiness = False
             self.game_started = False
